@@ -1,4 +1,4 @@
-import metacall
+import metacall._
 
 object Main {
 	def main(args: Array[String]) = {
