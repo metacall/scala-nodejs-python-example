@@ -1,5 +1,5 @@
 #
-#	MetaCall Python NodeJS Scala Example by Parra Studios
+#	MetaCall Scala NodeJS Python Example by Parra Studios
 #	An example of using Python and NodeJS from Scala.
 #
 #	Copyright (C) 2016 - 2020 Vicente Eduardo Ferrer Garcia <vic798@gmail.com>
@@ -20,52 +20,35 @@
 # Build Image
 FROM metacall/core:runtime AS builder
 
-# Image descriptor
-LABEL copyright.name="Vicente Eduardo Ferrer Garcia" \
-	copyright.address="vic798@gmail.com" \
-	maintainer.name="Vicente Eduardo Ferrer Garcia" \
-	maintainer.address="vic798@gmail.com" \
-	vendor="MetaCall Inc." \
-	version="0.1"
-
 # Install dependencies
 RUN apt-get update \
 	&& mkdir -p /usr/share/man/man1 \
 	&& apt-get install -y --no-install-recommends \
 		openjdk-11-jre-headless \
 		openjdk-11-jdk-headless \
-		scala \
+		apt-transport-https \
 		curl \
 		gnupg \
-	&& echo "deb https://dl.bintray.com/sbt/debian /" | tee -a /etc/apt/sources.list.d/sbt.list \
-	&& curl -sL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x2EE0EA64E40A89B84B2DF73499E82A75642AC823" | apt-key add \
+	&& echo "deb https://repo.scala-sbt.org/scalasbt/debian all main" | tee /etc/apt/sources.list.d/sbt.list \
+	&& echo "deb https://repo.scala-sbt.org/scalasbt/debian /" | tee /etc/apt/sources.list.d/sbt_old.list \
+	&& curl -sL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x2EE0EA64E40A89B84B2DF73499E82A75642AC823" \
+		| gpg --no-default-keyring --keyring gnupg-ring:/etc/apt/trusted.gpg.d/scalasbt-release.gpg --import \
+	&& chmod 644 /etc/apt/trusted.gpg.d/scalasbt-release.gpg \
 	&& apt-get update \
-	&& apt-get install -y --no-install-recommends sbt
+	&& apt-get install -y sbt
 
 # Force rebuild for latest version
 ARG DISABLE_CACHE=0
+ARG GITHUB_TOKEN
 
-# Copy MetaCall Scala Port
-ADD https://raw.githubusercontent.com/metacall/core/develop/source/ports/scala_port/metacall.scala .
+WORKDIR /root/metacall-scala-nodejs-python-example
 
-# Copy Scala script
-COPY main.scala .
+COPY . .
 
-# Build the scala project
-RUN scalac main.scala
-
-# TODO: ^ Use SBT and build properly the project
+RUN GITHUB_TOKEN=${GITHUB_TOKEN} sbt clean assembly
 
 # Runtime image
 FROM metacall/core:runtime AS runtime
-
-# Image descriptor
-LABEL copyright.name="Vicente Eduardo Ferrer Garcia" \
-	copyright.address="vic798@gmail.com" \
-	maintainer.name="Vicente Eduardo Ferrer Garcia" \
-	maintainer.address="vic798@gmail.com" \
-	vendor="MetaCall Inc." \
-	version="0.1"
 
 # Install dependencies
 RUN apt-get update \
@@ -74,15 +57,11 @@ RUN apt-get update \
 		openjdk-11-jre-headless \
 		scala
 
-# Copy scripts
-COPY scripts/ .
+WORKDIR /root
 
-# TODO: Copy build ouput
-# COPY --from=builder /usr/local/metacall/build/ .
+ENV LOADER_SCRIPT_PATH=/root/scripts
 
-# Environment variables for MetaCall
-ENV LOADER_LIBRARY_PATH=/usr/local/lib \
-	LOADER_SCRIPT_PATH=/usr/local/metacall
+COPY --from=builder /root/metacall-scala-nodejs-python-example/scripts /root/scripts
+COPY --from=builder /root/metacall-scala-nodejs-python-example/target /root
 
-# Set up the entry point
-CMD [ "scala", "Main" ]
+CMD [ "scala", "scala-2.13/metacall-scala-nodejs-python-example-assembly-0.1.0-SNAPSHOT.jar" ]

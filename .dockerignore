@@ -1,3 +1,5 @@
 **
+!project
 !scripts
-main.scala
+!src
+!build.sbt
